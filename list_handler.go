@@ -15,6 +15,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+var _ http.Handler = &listNamespacesHandler{}
+
 type listNamespacesHandler struct {
 	cfg *rest.Config
 	log *slog.Logger
