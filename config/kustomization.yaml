@@ -4,17 +4,5 @@ resources:
 - deployment.yaml
 - service.yaml
 - namespace.yaml
+- rbac.yaml
 namespace: namespace-lister
-configMapGenerator:
-- behavior: merge
-  files:
-  - traefik.yaml=./proxy-config/traefik.yaml
-  name: traefik-sidecar-static-config
-  options:
-    disableNameSuffixHash: true
-- behavior: merge
-  files:
-  - config.yaml=./proxy-config/dynamic/config.yaml
-  name: traefik-sidecar-dynamic-config
-  options:
-    disableNameSuffixHash: true

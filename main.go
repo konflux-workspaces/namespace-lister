@@ -3,6 +3,7 @@ package main
 import (
 	"cmp"
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -26,18 +27,28 @@ func main() {
 func run(l *slog.Logger) error {
 	log.SetLogger(logr.FromSlogHandler(l.Handler()))
 
+	l.Info("configuring k8s clients")
 	// get k8s rest config
 	cfg, err := config.GetConfig()
 	if err != nil {
-		return err
+		return fmt.Errorf("error getting config: %w", err)
 	}
 
 	// setup context
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
+	// create controller
+	l.Info("creating controller")
+	ctrl, err := NewController(ctx, l)
+	if err != nil {
+		return err
+	}
+
 	// build http server
-	s := buildServer(cfg, l)
+	l.Info("building server")
+	userHeader := cmp.Or(os.Getenv("HEADER_USERNAME"), "X-Email")
+	s := buildServer(cfg, l, ctrl, userHeader)
 
 	// HTTP Server graceful shutdown
 	go func() {
@@ -53,14 +64,22 @@ func run(l *slog.Logger) error {
 	}()
 
 	// start server
+	l.Info("serving...")
 	return s.ListenAndServe()
 }
 
-func buildServer(cfg *rest.Config, l *slog.Logger) *http.Server {
+func addLogMiddleware(l *slog.Logger, next http.Handler) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		l.Info("received request", "request", r.URL.Path)
+		next.ServeHTTP(w, r)
+	}
+}
+
+func buildServer(cfg *rest.Config, l *slog.Logger, ctrl *Controller, userHeader string) *http.Server {
 	// configure the server
 	h := http.NewServeMux()
-	h.Handle("GET /api/v1/namespaces", newListNamespacesHandler(rest.CopyConfig(cfg), l))
-	h.Handle("GET /api/v1/namespaces/{name}", newGetNamespaceHandler(rest.CopyConfig(cfg), l))
+	h.Handle("GET /api/v1/namespaces", addLogMiddleware(l, newListNamespacesHandler(rest.CopyConfig(cfg), l, ctrl, userHeader)))
+	h.Handle("GET /api/v1/namespaces/{name}", addLogMiddleware(l, newGetNamespaceHandler(rest.CopyConfig(cfg), l)))
 	return &http.Server{
 		Addr:              cmp.Or(os.Getenv("ADDRESS"), DefaultAddr),
 		Handler:           h,

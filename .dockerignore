@@ -3,3 +3,7 @@
 LICENSE
 README.md
 config/
+
+install-local.sh
+acceptance/
+

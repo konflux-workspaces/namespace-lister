@@ -28,6 +28,7 @@ func newGetNamespaceHandler(cfg *rest.Config, log *slog.Logger) http.Handler {
 
 func (h *getNamespaceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// build client
+	h.log.Info("serving get")
 	cli, err := buildImpersonatingClient(h.cfg, r.Header.Get("X-Username"))
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
