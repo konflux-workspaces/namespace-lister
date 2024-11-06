@@ -17,12 +17,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type Controller struct {
-	client.Client
+type Cache struct {
+	client.Reader
 	l *slog.Logger
 }
 
-func NewController(ctx context.Context, l *slog.Logger) (*Controller, error) {
+func NewCache(ctx context.Context, l *slog.Logger) (*Cache, error) {
 	cfg := ctrl.GetConfigOrDie()
 
 	s := runtime.NewScheme()
@@ -49,6 +49,9 @@ func NewController(ctx context.Context, l *slog.Logger) (*Controller, error) {
 			&rbacv1.Role{}:               {},
 		},
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	for _, o := range oo {
 		_, err := c.GetInformer(ctx, o)
@@ -66,24 +69,17 @@ func NewController(ctx context.Context, l *slog.Logger) (*Controller, error) {
 		return nil, fmt.Errorf("error starting the cache")
 	}
 
-	cli, err := client.New(cfg, client.Options{
-		Cache: &client.CacheOptions{Reader: c},
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return &Controller{Client: cli, l: l}, nil
+	return &Cache{Reader: c, l: l}, nil
 }
 
-func (c *Controller) ListNamespaces(ctx context.Context, username string) ([]corev1.Namespace, error) {
+func (c *Cache) ListNamespaces(ctx context.Context, username string) (*corev1.NamespaceList, error) {
 	// list role bindings
 	nn := v1.NamespaceList{}
-	if err := c.Client.List(ctx, &nn); err != nil {
+	if err := c.List(ctx, &nn); err != nil {
 		return nil, err
 	}
 
-	auz := NewAuthorizer(ctx, c.Client, c.l)
+	auz := NewAuthorizer(ctx, c, c.l)
 	rnn := []corev1.Namespace{}
 	for _, ns := range nn.Items {
 		d, _, err := auz.Authorize(ctx, authorizer.AttributesRecord{
@@ -105,6 +101,7 @@ func (c *Controller) ListNamespaces(ctx context.Context, username string) ([]cor
 			rnn = append(rnn, ns)
 		}
 	}
+	nn.Items = rnn
 
-	return rnn, nil
+	return &nn, nil
 }

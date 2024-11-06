@@ -40,7 +40,7 @@ func run(l *slog.Logger) error {
 
 	// create controller
 	l.Info("creating controller")
-	ctrl, err := NewController(ctx, l)
+	ctrl, err := NewCache(ctx, l)
 	if err != nil {
 		return err
 	}
@@ -75,7 +75,7 @@ func addLogMiddleware(l *slog.Logger, next http.Handler) http.HandlerFunc {
 	}
 }
 
-func buildServer(cfg *rest.Config, l *slog.Logger, ctrl *Controller, userHeader string) *http.Server {
+func buildServer(cfg *rest.Config, l *slog.Logger, ctrl *Cache, userHeader string) *http.Server {
 	// configure the server
 	h := http.NewServeMux()
 	h.Handle("GET /api/v1/namespaces", addLogMiddleware(l, newListNamespacesHandler(rest.CopyConfig(cfg), l, ctrl, userHeader)))

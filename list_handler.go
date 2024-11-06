@@ -6,9 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
 )
 
@@ -17,15 +15,15 @@ var _ http.Handler = &listNamespacesHandler{}
 type listNamespacesHandler struct {
 	cfg        *rest.Config
 	log        *slog.Logger
-	ctrl       *Controller
+	cache      *Cache
 	userHeader string
 }
 
-func newListNamespacesHandler(cfg *rest.Config, log *slog.Logger, ctrl *Controller, userHeader string) http.Handler {
+func newListNamespacesHandler(cfg *rest.Config, log *slog.Logger, cache *Cache, userHeader string) http.Handler {
 	return &listNamespacesHandler{
 		cfg:        cfg,
 		log:        log,
-		ctrl:       ctrl,
+		cache:      cache,
 		userHeader: userHeader,
 	}
 }
@@ -33,7 +31,7 @@ func newListNamespacesHandler(cfg *rest.Config, log *slog.Logger, ctrl *Controll
 func (h *listNamespacesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.log.Info("received list request")
 	// retrieve projects as the user
-	nn, err := h.ctrl.ListNamespaces(r.Context(), r.Header.Get(h.userHeader))
+	nn, err := h.cache.ListNamespaces(r.Context(), r.Header.Get(h.userHeader))
 	if err != nil {
 		serr := &kerrors.StatusError{}
 		if errors.As(err, &serr) {
@@ -49,11 +47,7 @@ func (h *listNamespacesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 
 	// build response
 	// for PoC limited to JSON
-	l := corev1.NamespaceList{
-		TypeMeta: metav1.TypeMeta{Kind: "NamespaceList", APIVersion: "v1"},
-		Items:    nn,
-	}
-	b, err := json.Marshal(l)
+	b, err := json.Marshal(nn)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		w.Write([]byte(err.Error()))
