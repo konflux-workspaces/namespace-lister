@@ -79,7 +79,6 @@ func buildServer(cfg *rest.Config, l *slog.Logger, ctrl *Controller, userHeader 
 	// configure the server
 	h := http.NewServeMux()
 	h.Handle("GET /api/v1/namespaces", addLogMiddleware(l, newListNamespacesHandler(rest.CopyConfig(cfg), l, ctrl, userHeader)))
-	h.Handle("GET /api/v1/namespaces/{name}", addLogMiddleware(l, newGetNamespaceHandler(rest.CopyConfig(cfg), l)))
 	return &http.Server{
 		Addr:              cmp.Or(os.Getenv("ADDRESS"), DefaultAddr),
 		Handler:           h,

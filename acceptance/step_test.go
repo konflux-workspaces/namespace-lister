@@ -12,14 +12,24 @@ import (
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func InjectSteps(ctx *godog.ScenarioContext) {
-	ctx.Step(`^the user can retrieve only the namespaces they have access to$`, TheUserCanRetrieveOnlyTheNamespacesTheyHaveAccessTo)
+	//read
+	ctx.Step(`^user has access to a namespace$`,
+		func(ctx context.Context) (context.Context, error) { return UserHasAccessToNNamespaces(ctx, 1) })
+	ctx.Step(`^the user can retrieve the namespace$`, TheUserCanRetrieveTheNamespace)
+
+	// list
 	ctx.Step(`^user has access to "([^"]*)" namespaces$`, UserHasAccessToNNamespaces)
+	ctx.Step(`^the user can retrieve only the namespaces they have access to$`, TheUserCanRetrieveOnlyTheNamespacesTheyHaveAccessTo)
 }
 
 func UserHasAccessToNNamespaces(ctx context.Context, number int) (context.Context, error) {
+	run := ctx.Value("run").(string)
+
 	cli, err := rest.BuildDefaultHostClient()
 	if err != nil {
 		return ctx, err
@@ -39,9 +49,10 @@ func UserHasAccessToNNamespaces(ctx context.Context, number int) (context.Contex
 	for i := range number {
 		if err := cli.Create(ctx, &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
-				Name: fmt.Sprintf("run-1-%d", i),
+				Name: fmt.Sprintf("run-%s-%d", run, i),
 				Labels: map[string]string{
-					"namespace-lister/scope": "acceptance-tests",
+					"namespace-lister/scope":    "acceptance-tests",
+					"namespace-lister/test-run": run,
 				},
 			},
 		}); err != nil {
@@ -50,8 +61,8 @@ func UserHasAccessToNNamespaces(ctx context.Context, number int) (context.Contex
 
 		cli.Create(ctx, &rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      fmt.Sprintf("run-1-%d", i),
-				Namespace: fmt.Sprintf("run-1-%d", i),
+				Name:      fmt.Sprintf("run-%s-%d", run, i),
+				Namespace: fmt.Sprintf("run-%s-%d", run, i),
 			},
 			RoleRef: rbacv1.RoleRef{
 				Kind:     "ClusterRole",
@@ -72,14 +83,7 @@ func UserHasAccessToNNamespaces(ctx context.Context, number int) (context.Contex
 }
 
 func TheUserCanRetrieveOnlyTheNamespacesTheyHaveAccessTo(ctx context.Context) (context.Context, error) {
-	// build impersonating client
-	cfg, err := rest.NewDefaultClientConfig()
-	if err != nil {
-		return ctx, err
-	}
-	cfg.Impersonate.UserName = "user"
-	cfg.Host = cmp.Or(os.Getenv("KONFLUX_ADDRESS"), "https://localhost:10443")
-	cli, err := rest.BuildClient(cfg)
+	cli, err := buildUserClient()
 	if err != nil {
 		return ctx, err
 	}
@@ -94,4 +98,32 @@ func TheUserCanRetrieveOnlyTheNamespacesTheyHaveAccessTo(ctx context.Context) (c
 	}
 
 	return ctx, nil
+}
+
+func TheUserCanRetrieveTheNamespace(ctx context.Context) (context.Context, error) {
+	run := ctx.Value("run").(string)
+
+	cli, err := buildUserClient()
+	if err != nil {
+		return ctx, err
+	}
+
+	n := corev1.Namespace{}
+	k := types.NamespacedName{Name: fmt.Sprintf("run-%s-0", run)}
+	if err := cli.Get(ctx, k, &n); err != nil {
+		return ctx, err
+	}
+
+	return ctx, nil
+}
+
+func buildUserClient() (client.Client, error) {
+	// build impersonating client
+	cfg, err := rest.NewDefaultClientConfig()
+	if err != nil {
+		return nil, err
+	}
+	cfg.Impersonate.UserName = "user"
+	cfg.Host = cmp.Or(os.Getenv("KONFLUX_ADDRESS"), "https://localhost:10443")
+	return rest.BuildClient(cfg)
 }
