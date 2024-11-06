@@ -1,5 +1,5 @@
 Feature: List Namespaces
 
-  Scenario: user list namespace
+  Scenario: user get namespace
     Given user has access to a namespace
     Then  the user can retrieve the namespace
