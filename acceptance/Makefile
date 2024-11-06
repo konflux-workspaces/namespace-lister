@@ -53,6 +53,15 @@ vet:
 clean:
 	kubectl delete namespace -l namespace-lister/scope=acceptance-tests
 
+.PHONY: wip
+wip: vet clean create-test-identity export-test-identity-kubeconfig
+	kubectl rollout status deployment -n namespace-lister namespace-lister
+	kubectl rollout status deployment -n namespace-lister namespace-lister-proxy
+	KUBECONFIG=/tmp/namespace-lister-acceptance-tests-user.kcfg \
+	KONFLUX_ADDRESS=https://localhost:10443 \
+	E2E_USE_INSECURE_TLS=true \
+		go test ./... -v --godog.tags=wip --godog.concurrency=1
+
 .PHONY: test
 test: vet clean create-test-identity export-test-identity-kubeconfig
 	kubectl rollout status deployment -n namespace-lister namespace-lister
