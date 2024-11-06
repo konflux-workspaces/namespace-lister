@@ -1,0 +1,16 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: namespace-lister-proxy
+  namespace: namespace-lister
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: namespace-lister-proxy
+  namespace: namespace-lister
+  annotations:
+    kubernetes.io/service-account.name: namespace-lister-proxy
+type: kubernetes.io/service-account-token
+---
