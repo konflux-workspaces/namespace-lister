@@ -70,3 +70,23 @@ test: vet clean create-test-identity export-test-identity-kubeconfig
 	KONFLUX_ADDRESS=https://localhost:10443 \
 	E2E_USE_INSECURE_TLS=true \
 		go test ./... -v --godog.tags=~skip --godog.concurrency=1
+
+
+ROOT_DIR := $(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
+LOCALBIN := $(ROOT_DIR)/bin
+
+OUTDIR := $(ROOT_DIR)/out
+
+GO ?= go
+
+GOLANG_CI ?= $(GO) run -modfile $(shell dirname $(ROOT_DIR))/hack/tools/golang-ci/go.mod github.com/golangci/golangci-lint/cmd/golangci-lint
+
+## Local Folders
+$(LOCALBIN):
+	mkdir $(LOCALBIN)
+$(OUTDIR):
+	@mkdir $(OUTDIR)
+
+.PHONY: lint
+lint: ## Run go linter.
+	$(GOLANG_CI) run ./...
