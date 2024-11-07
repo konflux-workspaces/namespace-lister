@@ -2,16 +2,12 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
-	"net/http"
 	"os"
 	"time"
 
 	"github.com/go-logr/logr"
-	"k8s.io/client-go/rest"
 
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 )
 
@@ -26,19 +22,12 @@ func main() {
 func run(l *slog.Logger) error {
 	log.SetLogger(logr.FromSlogHandler(l.Handler()))
 
-	l.Info("configuring k8s clients")
-	// get k8s rest config
-	cfg, err := config.GetConfig()
-	if err != nil {
-		return fmt.Errorf("error getting config: %w", err)
-	}
-
 	// setup context
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	// create controller
-	l.Info("creating controller")
+	l.Info("creating cache")
 	ctrl, err := NewCache(ctx, l)
 	if err != nil {
 		return err
@@ -47,7 +36,7 @@ func run(l *slog.Logger) error {
 	// build http server
 	l.Info("building server")
 	userHeader := getHeaderUsername()
-	s := buildServer(cfg, l, ctrl, userHeader)
+	s := buildServer(l, ctrl, userHeader)
 
 	// HTTP Server graceful shutdown
 	go func() {
@@ -65,22 +54,4 @@ func run(l *slog.Logger) error {
 	// start server
 	l.Info("serving...")
 	return s.ListenAndServe()
-}
-
-func addLogMiddleware(l *slog.Logger, next http.Handler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		l.Info("received request", "request", r.URL.Path)
-		next.ServeHTTP(w, r)
-	}
-}
-
-func buildServer(cfg *rest.Config, l *slog.Logger, ctrl *Cache, userHeader string) *http.Server {
-	// configure the server
-	h := http.NewServeMux()
-	h.Handle("GET /api/v1/namespaces", addLogMiddleware(l, newListNamespacesHandler(rest.CopyConfig(cfg), l, ctrl, userHeader)))
-	return &http.Server{
-		Addr:              getAddress(),
-		Handler:           h,
-		ReadHeaderTimeout: 3 * time.Second,
-	}
 }

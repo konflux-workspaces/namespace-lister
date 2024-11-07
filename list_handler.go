@@ -7,21 +7,18 @@ import (
 	"net/http"
 
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/client-go/rest"
 )
 
 var _ http.Handler = &listNamespacesHandler{}
 
 type listNamespacesHandler struct {
-	cfg        *rest.Config
 	log        *slog.Logger
 	cache      *Cache
 	userHeader string
 }
 
-func newListNamespacesHandler(cfg *rest.Config, log *slog.Logger, cache *Cache, userHeader string) http.Handler {
+func newListNamespacesHandler(log *slog.Logger, cache *Cache, userHeader string) http.Handler {
 	return &listNamespacesHandler{
-		cfg:        cfg,
 		log:        log,
 		cache:      cache,
 		userHeader: userHeader,
