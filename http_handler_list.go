@@ -33,12 +33,12 @@ func (h *listNamespacesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		serr := &kerrors.StatusError{}
 		if errors.As(err, &serr) {
 			w.WriteHeader(int(serr.Status().Code))
-			w.Write([]byte(serr.Error()))
+			h.write(w, []byte(serr.Error()))
 			return
 		}
 
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
+		h.write(w, []byte(err.Error()))
 		return
 	}
 
@@ -47,10 +47,19 @@ func (h *listNamespacesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 	b, err := json.Marshal(nn)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(err.Error()))
+		h.write(w, []byte(err.Error()))
 		return
 	}
 
 	w.Header().Add(HttpContentType, HttpContentTypeApplication)
-	w.Write(b)
+	h.write(w, b)
+}
+
+func (h *listNamespacesHandler) write(w http.ResponseWriter, data []byte) bool {
+	if _, err := w.Write(data); err != nil {
+		h.log.Error("error writing reply", "error", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return false
+	}
+	return true
 }

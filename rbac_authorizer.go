@@ -44,7 +44,7 @@ func (r *crAuthRetriever) ListRoleBindings(namespace string) ([]*rbacv1.RoleBind
 	}
 	r.l.Debug("listing rolebindings", "namespace", namespace, "rolebindings", rbb)
 
-	rbbp := make([]*rbacv1.RoleBinding, len(rbb.Items), len(rbb.Items))
+	rbbp := make([]*rbacv1.RoleBinding, len(rbb.Items))
 	for i, rb := range rbb.Items {
 		rbbp[i] = rb.DeepCopy()
 	}
@@ -71,7 +71,7 @@ func (r *crAuthRetriever) ListClusterRoleBindings() ([]*rbacv1.ClusterRoleBindin
 	}
 	r.l.Debug("listing clusterrolebindings", "clusterrolebindings", rbb)
 
-	rbbp := make([]*rbacv1.ClusterRoleBinding, len(rbb.Items), len(rbb.Items))
+	rbbp := make([]*rbacv1.ClusterRoleBinding, len(rbb.Items))
 	for i, rb := range rbb.Items {
 		rbbp[i] = rb.DeepCopy()
 	}
