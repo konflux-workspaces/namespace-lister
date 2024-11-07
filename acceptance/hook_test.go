@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/cucumber/godog"
+
+	tcontext "github.com/konflux-workspaces/namespace-lister/acceptance/pkg/context"
 )
 
 func InjectHooks(ctx *godog.ScenarioContext) {
@@ -11,5 +13,5 @@ func InjectHooks(ctx *godog.ScenarioContext) {
 }
 
 func injectRun(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
-	return context.WithValue(ctx, "run", sc.Id), nil
+	return tcontext.WithRunId(ctx, sc.Id), nil
 }

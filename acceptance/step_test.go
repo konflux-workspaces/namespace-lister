@@ -2,18 +2,22 @@ package acceptance
 
 import (
 	"cmp"
+	"context"
 	"fmt"
 	"os"
+	"slices"
 
 	"github.com/cucumber/godog"
-	"github.com/konflux-workspaces/namespace-lister/acceptance/pkg/rest"
-	"golang.org/x/net/context"
+
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	tcontext "github.com/konflux-workspaces/namespace-lister/acceptance/pkg/context"
+	"github.com/konflux-workspaces/namespace-lister/acceptance/pkg/rest"
 )
 
 func InjectSteps(ctx *godog.ScenarioContext) {
@@ -28,7 +32,7 @@ func InjectSteps(ctx *godog.ScenarioContext) {
 }
 
 func UserHasAccessToNNamespaces(ctx context.Context, number int) (context.Context, error) {
-	run := ctx.Value("run").(string)
+	run := tcontext.RunId(ctx)
 
 	cli, err := rest.BuildDefaultHostClient()
 	if err != nil {
@@ -46,8 +50,9 @@ func UserHasAccessToNNamespaces(ctx context.Context, number int) (context.Contex
 	}
 
 	// create namespaces
+	nn := []corev1.Namespace{}
 	for i := range number {
-		if err := cli.Create(ctx, &corev1.Namespace{
+		n := corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: fmt.Sprintf("run-%s-%d", run, i),
 				Labels: map[string]string{
@@ -55,11 +60,12 @@ func UserHasAccessToNNamespaces(ctx context.Context, number int) (context.Contex
 					"namespace-lister/test-run": run,
 				},
 			},
-		}); err != nil {
+		}
+		if err := cli.Create(ctx, &n); err != nil {
 			return ctx, err
 		}
 
-		cli.Create(ctx, &rbacv1.RoleBinding{
+		if err := cli.Create(ctx, &rbacv1.RoleBinding{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      fmt.Sprintf("run-%s-%d", run, i),
 				Namespace: fmt.Sprintf("run-%s-%d", run, i),
@@ -76,10 +82,14 @@ func UserHasAccessToNNamespaces(ctx context.Context, number int) (context.Contex
 					Name:     "user",
 				},
 			},
-		})
+		}); err != nil {
+			return ctx, err
+		}
+
+		nn = append(nn, n)
 	}
 
-	return ctx, nil
+	return tcontext.WithNamespaces(ctx, nn), nil
 }
 
 func TheUserCanRetrieveOnlyTheNamespacesTheyHaveAccessTo(ctx context.Context) (context.Context, error) {
@@ -88,20 +98,29 @@ func TheUserCanRetrieveOnlyTheNamespacesTheyHaveAccessTo(ctx context.Context) (c
 		return ctx, err
 	}
 
-	nn := corev1.NamespaceList{}
-	if err := cli.List(ctx, &nn); err != nil {
+	ann := corev1.NamespaceList{}
+	if err := cli.List(ctx, &ann); err != nil {
 		return ctx, err
 	}
 
-	if lnni := len(nn.Items); lnni != 10 {
-		return ctx, fmt.Errorf("expected 10 namespaces, found %d", lnni)
+	enn := tcontext.Namespaces(ctx)
+	if expected, actual := len(enn), len(ann.Items); expected != actual {
+		return ctx, fmt.Errorf("expected %d namespaces, actual %d", expected, actual)
+	}
+
+	for _, en := range enn {
+		if !slices.ContainsFunc(ann.Items, func(an corev1.Namespace) bool {
+			return en.Name == an.Name
+		}) {
+			return ctx, fmt.Errorf("expected namespace %s not found in actual namespace list: %v", en.Name, ann.Items)
+		}
 	}
 
 	return ctx, nil
 }
 
 func TheUserCanRetrieveTheNamespace(ctx context.Context) (context.Context, error) {
-	run := ctx.Value("run").(string)
+	run := tcontext.RunId(ctx)
 
 	cli, err := buildUserClient()
 	if err != nil {
@@ -112,6 +131,15 @@ func TheUserCanRetrieveTheNamespace(ctx context.Context) (context.Context, error
 	k := types.NamespacedName{Name: fmt.Sprintf("run-%s-0", run)}
 	if err := cli.Get(ctx, k, &n); err != nil {
 		return ctx, err
+	}
+
+	enn := tcontext.Namespaces(ctx)
+	if expected, actual := 1, len(enn); expected != actual {
+		return ctx, fmt.Errorf("expected %d namespaces, actual %d: %v", expected, actual, enn)
+	}
+
+	if expected, actual := n.Name, enn[0].Name; actual != expected {
+		return ctx, fmt.Errorf("expected namespace %s, actual %s", expected, actual)
 	}
 
 	return ctx, nil
