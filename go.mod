@@ -4,7 +4,6 @@ go 1.22.2
 
 require (
 	github.com/go-logr/logr v1.4.2
-	github.com/openshift/api v0.0.0-20240522145529-93d6bda14341
 	k8s.io/api v0.31.2
 	k8s.io/apimachinery v0.31.2
 	k8s.io/apiserver v0.31.0
