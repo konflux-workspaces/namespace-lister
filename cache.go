@@ -7,11 +7,11 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
-	"k8s.io/apiserver/pkg/authentication/user"
-	"k8s.io/apiserver/pkg/authorization/authorizer"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apiserver/pkg/authentication/user"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
+	"k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -19,7 +19,8 @@ import (
 
 type Cache struct {
 	client.Reader
-	l *slog.Logger
+	authorizer *rbac.RBACAuthorizer
+	l          *slog.Logger
 }
 
 func NewCache(ctx context.Context, l *slog.Logger) (*Cache, error) {
@@ -69,7 +70,11 @@ func NewCache(ctx context.Context, l *slog.Logger) (*Cache, error) {
 		return nil, fmt.Errorf("error starting the cache")
 	}
 
-	return &Cache{Reader: c, l: l}, nil
+	return &Cache{
+		Reader:     c,
+		authorizer: NewAuthorizer(ctx, c, l),
+		l:          l,
+	}, nil
 }
 
 func (c *Cache) ListNamespaces(ctx context.Context, username string) (*corev1.NamespaceList, error) {
@@ -84,10 +89,9 @@ func (c *Cache) ListNamespaces(ctx context.Context, username string) (*corev1.Na
 		return nil, err
 	}
 
-	auz := NewAuthorizer(ctx, c, c.l)
 	rnn := []corev1.Namespace{}
 	for _, ns := range nn.Items {
-		d, _, err := auz.Authorize(ctx, authorizer.AttributesRecord{
+		d, _, err := c.authorizer.Authorize(ctx, authorizer.AttributesRecord{
 			User:            &user.DefaultInfo{Name: username},
 			Verb:            "get",
 			Resource:        "namespaces",
