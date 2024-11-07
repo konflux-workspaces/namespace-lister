@@ -1,7 +1,6 @@
 package main
 
 import (
-	"cmp"
 	"context"
 	"fmt"
 	"log/slog"
@@ -47,7 +46,7 @@ func run(l *slog.Logger) error {
 
 	// build http server
 	l.Info("building server")
-	userHeader := cmp.Or(os.Getenv("HEADER_USERNAME"), "X-Email")
+	userHeader := getHeaderUsername()
 	s := buildServer(cfg, l, ctrl, userHeader)
 
 	// HTTP Server graceful shutdown
@@ -80,7 +79,7 @@ func buildServer(cfg *rest.Config, l *slog.Logger, ctrl *Cache, userHeader strin
 	h := http.NewServeMux()
 	h.Handle("GET /api/v1/namespaces", addLogMiddleware(l, newListNamespacesHandler(rest.CopyConfig(cfg), l, ctrl, userHeader)))
 	return &http.Server{
-		Addr:              cmp.Or(os.Getenv("ADDRESS"), DefaultAddr),
+		Addr:              getAddress(),
 		Handler:           h,
 		ReadHeaderTimeout: 3 * time.Second,
 	}

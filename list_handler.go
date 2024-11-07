@@ -54,6 +54,6 @@ func (h *listNamespacesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	w.Header().Add("Content-Type", "application/json;charset=utf-8")
+	w.Header().Add(HttpContentType, HttpContentTypeApplication)
 	w.Write(b)
 }
