@@ -6,11 +6,11 @@ import (
 	"log/slog"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apiserver/pkg/authentication/user"
 	"k8s.io/apiserver/pkg/authorization/authorizer"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -74,7 +74,12 @@ func NewCache(ctx context.Context, l *slog.Logger) (*Cache, error) {
 
 func (c *Cache) ListNamespaces(ctx context.Context, username string) (*corev1.NamespaceList, error) {
 	// list role bindings
-	nn := v1.NamespaceList{}
+	nn := corev1.NamespaceList{
+		TypeMeta: metav1.TypeMeta{
+			Kind:       "NamespaceList",
+			APIVersion: "",
+		},
+	}
 	if err := c.List(ctx, &nn); err != nil {
 		return nil, err
 	}
