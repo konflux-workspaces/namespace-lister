@@ -4,7 +4,6 @@ import (
 	"context"
 	"log/slog"
 	"os"
-	"time"
 
 	"github.com/go-logr/logr"
 
@@ -36,22 +35,9 @@ func run(l *slog.Logger) error {
 	// build http server
 	l.Info("building server")
 	userHeader := getHeaderUsername()
-	s := buildServer(l, ctrl, userHeader)
+	s := NewServer(l, ctrl, userHeader)
 
-	// HTTP Server graceful shutdown
-	go func() {
-		<-ctx.Done()
-
-		sctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		defer cancel()
-
-		if err := s.Shutdown(sctx); err != nil {
-			l.Error("error gracefully shutting down the HTTP server", "error", err)
-			os.Exit(1)
-		}
-	}()
-
-	// start server
+	// start the server
 	l.Info("serving...")
-	return s.ListenAndServe()
+	return s.Start(ctx)
 }
